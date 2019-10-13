@@ -27,7 +27,9 @@ while True:
     try:
         dns_local_query_find_name = dns_local_query.find_rrset(dns_local_query.question, dns_local_query.question[0].name, dns.rdataclass.IN, dns.rdatatype.AAAA)
     except KeyError:
-        pass
+        dns_remote_response = dns.query.udp(dns_local_query, bypass_ns)
+        s.sendto(dns_remote_response.to_wire(), address)
+        continue
 
     # RegExp for YggNS name format and try to grab it from query
     re_ygg_full_domain = re.compile("([0-9a-zA-Z\-]*\.)*0[2,3]{1}[0-9a-fA-F]{30}\.ygg\.")
