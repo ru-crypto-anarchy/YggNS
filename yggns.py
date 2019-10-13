@@ -50,7 +50,7 @@ while True:
         try:
             dns_remote_response = dns.query.udp(dns_local_query, ygg_dns_address_ipv6, query_timeout)
         except dns.exception.Timeout:
-            pass
+            continue
         s.sendto(dns_remote_response.to_wire(), address)
 
     # ELSE do a query to bypass nameserver
