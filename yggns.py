@@ -4,7 +4,7 @@
 # Local DNS-proxy IP
 address = '::1'
 # Local DNS-proxy port
-port = 53535
+port = 53
 # DNS for query-bypass (if query is NOT for an YggNS)
 bypass_ns = '8.8.8.8'
 # Query timeout
@@ -50,7 +50,7 @@ while True:
         try:
             dns_remote_response = dns.query.udp(dns_local_query, ygg_dns_address_ipv6, query_timeout)
         except dns.exception.Timeout:
-            continue
+            pass
         s.sendto(dns_remote_response.to_wire(), address)
 
     # ELSE do a query to bypass nameserver
