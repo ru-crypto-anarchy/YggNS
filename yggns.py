@@ -4,7 +4,7 @@
 # Local DNS-proxy IP
 address = '::1'
 # Local DNS-proxy port
-port = 53
+port = 53535
 # DNS for query-bypass (if query is NOT for an YggNS)
 bypass_ns = '8.8.8.8'
 # Query timeout
