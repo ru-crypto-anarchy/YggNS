@@ -14,6 +14,26 @@ import socket
 import re
 import dns.message
 import dns.query
+import base64
+import binascii
+
+# Compile RegExps
+re_catch_domain_ipv6 = re.compile(";QUESTION\n([0-9a-zA-Z\-\_]*\.)*((?P<ipv6>0[2,3]{1}[0-9a-fA-F]{30})|(?P<b32>[2,3]{1}[A-Za-z2-7]{24}))\.ygg\..+\n;ANSWER", re.MULTILINE)
+
+def catch_ygg_ipv6_address(dns_query):
+    match_catch_domain_ipv6 = re.search(re_catch_domain_ipv6, dns_query.to_text())
+    if match_catch_domain_ipv6:
+        if match_catch_domain_ipv6.group('ipv6'):
+            catch_domain_ipv6 = match_catch_domain_ipv6.group('ipv6')
+        elif match_catch_domain_ipv6.group('b32'):
+            catch_domain_ipv6 = '0' + match_catch_domain_ipv6.group('b32')[:1] + binascii.b2a_hex(base64.b32decode(match_catch_domain_ipv6.group('b32')[1:].upper())).decode("ascii")
+        ygg_dns_ipv6 = ''
+        for l in range(8):
+            ygg_dns_ipv6 = ygg_dns_ipv6 + str(catch_domain_ipv6[l*4:l*4+4]) + ':'
+        ygg_dns_ipv6 = ygg_dns_ipv6[:-1]
+        return ygg_dns_ipv6
+    else:
+        return False
 
 s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
 s.bind((address, port))
@@ -23,36 +43,15 @@ while True:
     (wire, address) = s.recvfrom(512)
     dns_local_query = dns.message.from_wire(wire)
 
-    # Try to grap DNS query info from packet
-    try:
-        dns_local_query_find_name = dns_local_query.find_rrset(dns_local_query.question, dns_local_query.question[0].name, dns.rdataclass.IN, dns.rdatatype.AAAA)
-    except KeyError:
-        dns_remote_response = dns.query.udp(dns_local_query, bypass_ns)
-        s.sendto(dns_remote_response.to_wire(), address)
-        continue
+    ygg_dns_ipv6 = catch_ygg_ipv6_address(dns_local_query)
 
-    # RegExp for YggNS name format and try to grab it from query
-    re_ygg_full_domain = re.compile("([0-9a-zA-Z\-]*\.)*0[2,3]{1}[0-9a-fA-F]{30}\.ygg\.")
-    match_ygg_full_domain = re.search(re_ygg_full_domain, str(dns_local_query_find_name.name))
-
-    # IF name from query is in YggNS format THEN try to resolve it through Yggdrasil
-    if match_ygg_full_domain:
-        # RegExp IPv6-part from full name and convert it to IPv6 address
-        re_ygg_dns_address = re.compile("\.?0[2,3]{1}[0-9a-fA-F]{30}\.ygg\.$")
-        match_ygg_dns_address = re.search(re_ygg_dns_address, match_ygg_full_domain.group())
-        ygg_dns_address = match_ygg_dns_address.group().replace('.', '').replace('ygg', '')
-        ygg_dns_address_ipv6 = ''
-        for l in range(8):
-            ygg_dns_address_ipv6 = ygg_dns_address_ipv6 + str(ygg_dns_address[l*4:l*4+4]) + ':'
-        ygg_dns_address_ipv6 = ygg_dns_address_ipv6[:-1]
-
+    if ygg_dns_ipv6:
         # Do a query and sent it back to client
         try:
-            dns_remote_response = dns.query.udp(dns_local_query, ygg_dns_address_ipv6, query_timeout)
+            dns_remote_response = dns.query.udp(dns_local_query, ygg_dns_ipv6, query_timeout)
         except dns.exception.Timeout:
             continue
         s.sendto(dns_remote_response.to_wire(), address)
-
     # ELSE do a query to bypass nameserver
     else:
         dns_remote_response = dns.query.udp(dns_local_query, bypass_ns)
